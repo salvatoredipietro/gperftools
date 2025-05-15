@@ -37,14 +37,14 @@
 #include "base/spinlock_internal.h"
 #include "base/sysinfo.h"   /* for GetSystemCPUsCount() */
 
-#if defined(__GNUC__) && defined(__aarch64__)
+#if defined(__linux__) && defined(__GNUC__) && defined(__aarch64__)
 #include <sys/auxv.h>
 
 #ifndef HWCAP_SB
 #define HWCAP_SB		(1 << 29)
 #endif  // HWCAP_SB
 
-#endif // end __aarch64__
+#endif
 
 // NOTE on the Lock-state values:
 //
@@ -74,6 +74,7 @@ inline void SpinlockPause(void) {
 #if defined(__GNUC__) && (defined(__i386__) || defined(__x86_64__))
   __asm__ __volatile__("rep; nop" : : );
 #elif defined(__GNUC__) && defined(__aarch64__)
+#if defined(__linux__)
   static int use_spin_delay_sb = -1;
 
   // Use SB instruction if available otherwise ISB
@@ -88,6 +89,9 @@ inline void SpinlockPause(void) {
     else
       use_spin_delay_sb = 0;
   }
+#else
+  __asm__ __volatile__(" isb;  \n");
+#endif  // __linux__
 #endif
 }
 
