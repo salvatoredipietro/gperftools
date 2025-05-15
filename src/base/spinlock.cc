@@ -39,6 +39,11 @@
 
 #if defined(__GNUC__) && defined(__aarch64__)
 #include <sys/auxv.h>
+
+#ifndef HWCAP_SB
+#define HWCAP_SB		(1 << 29)
+#endif  // HWCAP_SB
+
 #endif // end __aarch64__
 
 // NOTE on the Lock-state values:
@@ -72,7 +77,7 @@ inline void SpinlockPause(void) {
   static int use_spin_delay_sb = -1;
 
   // Use SB instruction if available otherwise ISB
-  if (__builtin_expect(use_spin_delay_sb == 1, 1)) {
+  if (PREDICT_TRUE(use_spin_delay_sb == 1)) {
     __asm__ __volatile__(".inst 0xd50330ff  \n");   // SB instruction encoding
   } else if (use_spin_delay_sb == 0) {
     __asm__ __volatile__(" isb;  \n");
