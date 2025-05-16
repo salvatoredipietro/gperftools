@@ -55,6 +55,8 @@
 static int adaptive_spin_count = 0;
 
 namespace {
+static int arm_use_spin_delay_sb = 0;
+
 struct SpinLock_InitHelper {
   SpinLock_InitHelper() {
     // On multi-cpu machines, spin for longer before yielding
@@ -62,6 +64,12 @@ struct SpinLock_InitHelper {
     if (GetSystemCPUsCount() > 1) {
       adaptive_spin_count = 1000;
     }
+
+#if defined(__linux__) && (defined(__aarch64__) || defined(__arm64__)) 
+    // Initialize arm_use_spin_delay_sb variable to use `sb` if supported
+    if ((getauxval(AT_HWCAP) & HWCAP_SB) != 0)
+      arm_use_spin_delay_sb = 1;
+#endif
   }
 };
 
@@ -74,24 +82,12 @@ inline void SpinlockPause(void) {
 #if defined(__GNUC__) && (defined(__i386__) || defined(__x86_64__))
   __asm__ __volatile__("rep; nop" : : );
 #elif defined(__GNUC__) && defined(__aarch64__)
-#if defined(__linux__)
-  static int use_spin_delay_sb = -1;
-
   // Use SB instruction if available otherwise ISB
-  if (PREDICT_TRUE(use_spin_delay_sb == 1)) {
+  if (PREDICT_TRUE(arm_use_spin_delay_sb == 1)) {
     __asm__ __volatile__(".inst 0xd50330ff" : : );   // SB instruction encoding
-  } else if (use_spin_delay_sb == 0) {
-    __asm__ __volatile__("isb" : : );
   } else {
-    // Initialize variable and use getauxval fuction as delay
-    if ((getauxval(AT_HWCAP) & HWCAP_SB) != 0)
-      use_spin_delay_sb = 1;
-    else
-      use_spin_delay_sb = 0;
+    __asm__ __volatile__("isb" : : );
   }
-#else
-  __asm__ __volatile__("isb" : : );
-#endif  // __linux__
 #endif
 }
 
