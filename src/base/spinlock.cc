@@ -55,7 +55,7 @@
 static int adaptive_spin_count = 0;
 
 namespace {
-static int arm_use_spin_delay_sb = 0;
+static bool arm_use_spin_delay_sb = 0;
 
 struct SpinLock_InitHelper {
   SpinLock_InitHelper() {
@@ -65,10 +65,10 @@ struct SpinLock_InitHelper {
       adaptive_spin_count = 1000;
     }
 
-#if defined(__linux__) && (defined(__aarch64__) || defined(__arm64__)) 
-    // Initialize arm_use_spin_delay_sb variable to use `sb` if supported
+#if defined(__linux__) && (defined(__aarch64__) || defined(__arm64__))
+    // Set arm_use_spin_delay_sb variable to "true" to use `sb` if supported
     if ((getauxval(AT_HWCAP) & HWCAP_SB) != 0)
-      arm_use_spin_delay_sb = 1;
+      arm_use_spin_delay_sb = true;
 #endif
   }
 };
@@ -83,7 +83,7 @@ inline void SpinlockPause(void) {
   __asm__ __volatile__("rep; nop" : : );
 #elif defined(__GNUC__) && defined(__aarch64__)
   // Use SB instruction if available otherwise ISB
-  if (PREDICT_TRUE(arm_use_spin_delay_sb == 1)) {
+  if (PREDICT_TRUE(arm_use_spin_delay_sb == true)) {
     __asm__ __volatile__(".inst 0xd50330ff" : : );   // SB instruction encoding
   } else {
     __asm__ __volatile__("isb" : : );
